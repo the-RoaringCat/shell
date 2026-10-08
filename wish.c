@@ -10,27 +10,9 @@
 
 extern FILE *stdin;
 
-void builtin_exit(int argc, char **argv) {
-    exit(0);
-}
-
-void builtin_cd(int argc, char **argv) {
-    if (argc != 2) {
-        printf("Expect only one argument\n");
-        return;
-    }
-
-    if (chdir(argv[1]) == -1) {
-        printf("Error in cd\n");
-    }
-}
-
-void builtin_echo(int argc, char **argv) {
-    for (int i = 1;(argv[i] != NULL); i++) {
-        printf("%s", argv[i]);
-    }
-    printf("\n");
-}
+void builtin_exit(int argc, char **argv);
+void builtin_cd(int argc, char **argv);
+void builtin_echo(int argc, char **argv);
 
 void parse(int *argc, char **argv, char *input_ptr, char *delim);
 int parse_redir(int argc, char **argv, char **file, int *is_symbol_found);
@@ -48,33 +30,60 @@ COMMAND commands[] = {
     {"echo", builtin_echo}
 };
 
-
 int main(int argc, char *argv[]) {
-    int is_exit = 1;
-    while(is_exit) {
-        printf("wish> ");
+    int is_batch_mode = 0;
+    FILE *batch_fp; //batch
+    FILE *input_stream = stdin;
 
+    if (argc > 2) {
+        printf("Too many arguments\n");
+        exit(1);
+    } else if (argc == 2) {
+        is_batch_mode = 1;
+        batch_fp = fopen(argv[1], "r");
+        if (batch_fp == NULL) {
+            printf("Error in opening the batch file\n");
+        }
+        input_stream = batch_fp;
+    }
+
+    //main loop
+    while(1) {
+        if (is_batch_mode == 0) {
+            printf("wish> ");    
+        }
+        
         //take and parse user input
-        char *input_ptr = NULL;
+        char *raw_input = NULL;
         size_t allocated_len = 0;
         ssize_t nread;
 
-        nread = getline(&input_ptr, &allocated_len, stdin);
-        if (nread == -1) {
-            printf("Error in reading input\n");
+        nread = getline(&raw_input, &allocated_len, input_stream);
+        if (nread == -1) {  //when hitting EOF or error
+            if (ferror(input_stream)) {
+                perror("reading input");
+            }
+            exit(0);
         }
+        
 
         //parse input
         int count = 0;
         char **vector = malloc(CAPACITY * sizeof(char *));
         char *redir_path;
         int is_redir;
-        parse(&count, vector, input_ptr, " \n");
+
+        parse(&count, vector, raw_input, " \n");
+        //TODO multiple whitespace causes trouble
+
         if (parse_redir(count, vector, &redir_path, &is_redir) == -1 && is_redir == 1) {
             printf("Error in redirection format\n");
-            continue;   //advance to the next input loop
+            if (is_batch_mode) {
+                exit(1);
+            }
+            goto done;   //advance to the next input loop
         }
-        //TODO redireciton after getting the redirected file
+        
 
 
         //debugging
@@ -105,8 +114,9 @@ int main(int argc, char *argv[]) {
         }
     
         //deallocate
-        free(input_ptr);
-        free(vector);
+        done:
+            free(raw_input);
+            free(vector);
     }
 }
 
@@ -115,7 +125,7 @@ void parse(int *argc, char **argv, char *input_ptr, char *delim) {
     char *token;
     int n = 0;
     int capacity = CAPACITY;
-    while (token = strsep(&input_ptr, delim)) {//NULL check
+    while ((token = strsep(&input_ptr, delim))) {//NULL check
             if (*token == '\0') {   //helpful when the last character happen to be delimiter, in this case
                                     //input_ptr is NULL only one loop later, resulting in one extra vector
                 continue;
@@ -164,7 +174,7 @@ int spawn(char **argv, char *redir_path, int is_redir) {
         return 0;
     } else if (child_pid < 0) {
         //fork error
-        printf("Error in forking a child\n");
+        perror("fork");
         return -1;
     } else {
         //child
@@ -172,15 +182,37 @@ int spawn(char **argv, char *redir_path, int is_redir) {
         if (is_redir) {       
             close(STDOUT_FILENO);
             if (open(redir_path, O_CREAT | O_TRUNC | O_WRONLY, S_IRWXU) == -1) {
-                printf("Error in creating file\n");
+                perror("open");
                 exit(1);
             }
         }
 
         if (execvp(argv[0], argv) == -1) {
             dup2(fd, STDOUT_FILENO);    //restore original stdout if redireted
-            printf("Error in exec\n");
+            printf("Error in exec\n");  //should not return here if exec is successful
             exit(1);
         }
     }    
+}
+
+void builtin_exit(int argc, char **argv) {
+    exit(0);
+}
+
+void builtin_cd(int argc, char **argv) {
+    if (argc != 2) {
+        printf("Expect only one argument\n");
+        return;
+    }
+
+    if (chdir(argv[1]) == -1) {
+        printf("Error in cd\n");
+    }
+}
+
+void builtin_echo(int argc, char **argv) {
+    for (int i = 1;(argv[i] != NULL); i++) {
+        printf("%s", argv[i]);
+    }
+    printf("\n");
 }
