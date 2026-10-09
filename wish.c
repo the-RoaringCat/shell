@@ -6,16 +6,19 @@
 #include <fcntl.h>
 
 #define CAPACITY 4
-#define DEBUG
+//#define DEBUG
 
 extern FILE *stdin;
+
+int builtin_exec(int argc, char **argv);
+
 
 void builtin_exit(int argc, char **argv);
 void builtin_cd(int argc, char **argv);
 void builtin_echo(int argc, char **argv);
 
-void parse(int *argc, char **argv, char *input_ptr, char *delim);
-int parse_redir(int argc, char **argv, char **file, int *is_symbol_found);
+int parse(char **argv, char *input_ptr, char *delim);
+int parse_redir(int argc, char **argv, char **redir_path);
 int spawn(char **argv, char *redir_path, int is_redir);
 
 typedef void (*builtin_func)(int argc, char **argv);
@@ -66,27 +69,17 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
         
-
         //parse input
         int count = 0;
+        int is_redir;
         char **vector = malloc(CAPACITY * sizeof(char *));
         char *redir_path;
-        int is_redir;
-
-        parse(&count, vector, raw_input, " \n");
-        //TODO multiple whitespace causes trouble
-
-        if (parse_redir(count, vector, &redir_path, &is_redir) == -1 && is_redir == 1) {
-            printf("Error in redirection format\n");
-            if (is_batch_mode) {
-                exit(1);
-            }
-            goto done;   //advance to the next input loop
-        }
         
+        count = parse(vector, raw_input, " \t\n");
+        if (count == 0) { //when user enter nothing
+            goto cleanup;
+        }
 
-
-        //debugging
         #ifdef DEBUG
         printf("\n==========DEBUG==========\n");
         for (int i = 0; i < count; i++) {
@@ -97,73 +90,71 @@ int main(int argc, char *argv[]) {
         printf("==========DEBUG==========\n\n");
         #endif
 
-        //built-in command
-        int cmd_cnt = sizeof(commands) / sizeof(commands[0]);  
-        int is_builtin = 0;
-        for (int i = 0; i < cmd_cnt; i++) {
-            if (strcmp(commands[i].name, vector[0]) == 0) {
-                commands[i].func(count, vector);
-                is_builtin = 1;
-                break;
+        is_redir = parse_redir(count, vector, &redir_path);
+        if (is_redir == -1) {
+            printf("Error in redirection format\n");
+            if (is_batch_mode) {
+                exit(1);
             }
+            goto cleanup;    
         }
-    
-        //create child process and have the child execute the command
-        if (is_builtin == 0) {
+
+        //test and execute built-in command if any, or fork a child to exec external command
+        if (builtin_exec(count, vector) == 0) {
             spawn(vector, redir_path, is_redir);
         }
-    
+           
         //deallocate
-        done:
+        cleanup:
             free(raw_input);
             free(vector);
     }
 }
 
 //seperate the raw string input into an array of string as delimited
-void parse(int *argc, char **argv, char *input_ptr, char *delim) {
+//return the number of parts
+int parse(char **argv, char *input_ptr, char *delim) {
     char *token;
     int n = 0;
     int capacity = CAPACITY;
     while ((token = strsep(&input_ptr, delim))) {//NULL check
-            if (*token == '\0') {   //helpful when the last character happen to be delimiter, in this case
-                                    //input_ptr is NULL only one loop later, resulting in one extra vector
-                continue;
-            } 
+        if (*token == '\0') { //when the first is a delim, empty string is returned, which we don't want
+            continue;
+        } 
 
-            n++;
-            if (n > capacity) {
-                capacity *= 2;
-                argv = realloc(argv, capacity * sizeof(char *));
-            }
-
-            argv[n - 1] = token;    
+        n++;
+        if (n > capacity) {
+            capacity *= 2;
+            argv = realloc(argv, capacity * sizeof(char *));
         }
-        argv[n] = NULL;
-        *argc = n;
+
+        argv[n - 1] = token;    
+    }
+    argv[n] = NULL;
+    return n;
 }
 
 //find the redirection path delim by the first < , is_redir is set to 1
 //if not found or format error, redir path is NULL
-int parse_redir(int argc, char **argv, char **redir_path, int *is_redir) {
+int parse_redir(int argc, char **argv, char **redir_path) {
     int i;
-    *is_redir = 0;          //assume > not found first
 
     for (i = 0; i < argc; i++) {    //find >
-        if (strcmp(">", argv[i]) == 0) {
-            *is_redir = 1;
+        if (strcmp(">", argv[i]) == 0) {        
             break;
         }
     }
-
-    if (i != (argc - 2)) {  //i should be the index of > which is at argv[argc - 2]
+    
+    if (i == argc) {                //no redirect symbol found
+        return 0;
+    } else if (i != (argc - 2)) {   //symbol found but more than 1 elem after the symbol
         *redir_path = NULL;
         return -1;
-    }
-
-    argv[i] = NULL;         //let it point to NULL to indicate the first part of the command
-    *redir_path = argv[i + 1];    //the next element after > should be the redir_path 
-    return 0;
+    } else {                        //symbol found and format correct
+        argv[i] = NULL;             //seperate the two parts
+        *redir_path = argv[i + 1];  
+        return 1;
+    } 
 }
 
 int spawn(char **argv, char *redir_path, int is_redir) {
@@ -193,6 +184,17 @@ int spawn(char **argv, char *redir_path, int is_redir) {
             exit(1);
         }
     }    
+}
+
+int builtin_exec(int argc, char **argv) {
+    int cmd_cnt = sizeof(commands) / sizeof(commands[0]);  
+    for (int i = 0; i < cmd_cnt; i++) {
+            if (strcmp(commands[i].name, argv[0]) == 0) {
+                commands[i].func(argc, argv);
+                return 1;
+            }
+    }
+    return 0;
 }
 
 void builtin_exit(int argc, char **argv) {
