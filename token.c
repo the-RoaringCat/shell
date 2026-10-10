@@ -57,37 +57,6 @@ typedef enum {
     DOUBLE_QUOTE
 } STATE;
 
-// void sb_append(char new_c, STRINGBUILDER *sb) {
-//     //init
-//     if (sb->string == NULL) {
-//         sb->len = 0;
-//         sb->capacity = INIT_CAPACITY;
-//         sb-> string = malloc(INIT_CAPACITY * sizeof(char));
-//     }
-//     //check len
-//     if (sb->len == sb->capacity) {
-//         sb->capacity *=  2;
-//         sb->string = realloc(sb->string, sb->capacity);
-//     }
-//     //append
-//     sb->string[len] = new_c;
-//     sb->len += 1;
-// }
-
-// void token_append(char *value, TOKENTYPE type, TOKENARRAY *t_array) {
-//     //init
-//     if (t_array->tokens == NULL) {
-//         t_array->len = 0;
-//         t_array->capacity = INIT_CAPACITY;
-//         t_array->tokens = malloc(INIT_CAPACITY * sizeof(TOKEN));
-//     }
-
-//     //check len
-//     if (t_array->len == t_array->capacity) {
-//         t_array->capacity *= 2;
-//         t_array->tokens = realloc(t_array->tokens)
-//     }
-// }
 
 TOKENTYPE findtype(char c) {
     switch(c) {
@@ -103,6 +72,10 @@ TOKENTYPE findtype(char c) {
             return WORD;
     }
 }
+//TODO: add '\0' to the end when it finishes building a word
+//TODO: is there a better way to emit a word, code repetes alot
+//TODO: implement error handling
+//TODO another case for escape? for expansion
 
 TOKENARRAY tokenize(const char *input)
 {
@@ -119,7 +92,7 @@ TOKENARRAY tokenize(const char *input)
         switch (state) {
         case NORMAL:    
             switch (c) {
-                case '\\': //another case for escape?
+                case '\\': 
                     char next_c = input[i + 1];
 
                     //next is terminate: wrong
@@ -137,12 +110,8 @@ TOKENARRAY tokenize(const char *input)
                     break;
 
                 case '\'':  //fall through
-                case '"':
-                    if (word_started) {
-                        TOKEN t = {WORD, sb.items};
-                        da_append(t_array, t);
-                        sb = da_INIT(STRINGBUILDER);   //start a new stringbuilder
-                    }
+                case '"':               
+                    word_started = 1;
                     left_quote = c;
                     state = QUOTE;
                     break;
@@ -180,21 +149,16 @@ TOKENARRAY tokenize(const char *input)
             if (c != left_quote) {
                 da_append(sb, c);
             } else {
-                TOKEN t = {WORD, sb.items}; //items nullable, when ""
-                da_append(t_array, t);
-                word_started = 0;
                 state = NORMAL;
             }
             break;
-        }
-        
+        }   
     }
-    if (word_started) {
+    if (word_started) { //if there is one last word
         TOKEN t = {WORD, sb.items};
         da_append(t_array, t); 
     }
 
-    free(sb.items);
     return t_array;
 }
 char *typetostr(TOKENTYPE type) {
