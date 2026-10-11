@@ -23,6 +23,9 @@
         da.items[da.len++] = item;\
     } while (0)
 
+//return 1 if flag is 1 and flag cleared, return 0 if flag is 0. 
+#define test_and_clear(flag) (flag && (flag = 0, 1))
+
 extern FILE *stdin;
 
 typedef enum {
@@ -30,7 +33,8 @@ typedef enum {
     PIPE,
     PARALLEL,
     REDIR_IN,
-    REDIR_OUT
+    REDIR_OUT,
+    VOID
 } TOKENTYPE;
 
 typedef struct token {
@@ -72,39 +76,40 @@ TOKENTYPE findtype(char c) {
             return WORD;
     }
 }
-//TODO: add '\0' to the end when it finishes building a word
-//TODO: is there a better way to emit a word, code repetes alot
-//TODO: implement error handling
+
+
 //TODO another case for escape? for expansion
 
-TOKENARRAY tokenize(const char *input)
+int tokenize(const char *input, TOKENARRAY *user_t_array)
 {
-    TOKENARRAY t_array = da_INIT(TOKENARRAY);   
+    TOKENARRAY t_array = da_INIT(TOKENARRAY);  
+    *user_t_array = t_array; 
     STRINGBUILDER sb = da_INIT(STRINGBUILDER);
     
+    int emit_word = 0; //a simplistic queue, cleared after each loop
+    int emit_special = 0;
+
     STATE state = NORMAL;
     char left_quote = '\0';
     int word_started = 0; //need this bcos token no necessarily delim by whitespace
 
     for (size_t i = 0; input[i] != '\0'; i++) {
         char c = input[i];
+        char next_c = input[i + 1];
 
         switch (state) {
         case NORMAL:    
             switch (c) {
                 case '\\': 
-                    char next_c = input[i + 1];
-
                     //next is terminate: wrong
-                    if(next_c == '\0') {
-                        //handle error
-                    }
+                    if(next_c == '\0') goto error;
 
                     //next_c is either ignored or appened
-                    i++;                    
-                    if(next_c == '\n') {    //next is newline: ignore the newline               
-                       continue; 
-                    }
+                    i++;  
+
+                    //next is newline: ignore the newline                
+                    if(next_c == '\n') continue; 
+
                     word_started = 1;
                     da_append(sb, next_c);  //next is other: append to the buffer
                     break;
@@ -120,46 +125,56 @@ TOKENARRAY tokenize(const char *input)
                 case '|':   //fall through            
                 case '<':   //fall through
                 case '>':
-                    TOKEN t;
-                    if (word_started) {
-                        word_started = 0;
-                        t = (TOKEN){WORD, sb.items};
-                        da_append(t_array, t);
-                        sb = da_INIT(STRINGBUILDER);   //start a new stringbuilder
-                    }
-                    t = (TOKEN){findtype(c), NULL};
-                    da_append(t_array, t);
+                    if (test_and_clear(word_started)) emit_word = 1;
+                    emit_special = 1;
                     break;
                 default:
                     if (isspace(c)) {
-                        if (word_started) {
-                            word_started = 0;
-                            TOKEN t = {WORD, sb.items};
-                            da_append(t_array, t);
-                            sb = da_INIT(STRINGBUILDER);
-                        }
+                        if (test_and_clear(word_started)) emit_word = 1;            
                     } else {
                         word_started = 1;
                         da_append(sb, c);
                     }
-            }
+            } //end of inner switch
             break;
         
         case QUOTE:
             if (c != left_quote) {
+                //terminate before closing quote
+                if (next_c == '\0') goto error;
                 da_append(sb, c);
             } else {
                 state = NORMAL;
             }
             break;
-        }   
-    }
+        } //end of switch
+
+        if (test_and_clear(emit_word)) {
+            da_append(sb, '\0');    //terminate a string which also deal with empty string token
+            TOKEN t = {WORD, sb.items};
+            da_append(t_array, t);
+            sb = da_INIT(STRINGBUILDER);    //start a new stringbuilder
+        } 
+        if (test_and_clear(emit_special)) {
+            TOKEN t = {findtype(c), strndup(&c, 1)};    //can change to NULL, as only type matters
+            da_append(t_array, t);
+        }
+    } //end of char loop
     if (word_started) { //if there is one last word
+        da_append(sb, '\0');
         TOKEN t = {WORD, sb.items};
         da_append(t_array, t); 
     }
+    *user_t_array = t_array;
+    return 0;
 
-    return t_array;
+    error:
+        //free whatever emitted, then free the stringbuilder
+        for (int i = 0; i < t_array.len; i++) {
+            free(t_array.items[i].value);
+        }
+        free(sb.items);
+        return -1;
 }
 char *typetostr(TOKENTYPE type) {
     switch(type) {
@@ -192,11 +207,15 @@ int main(int argc, char *argv[]) {
             exit(0);
         }
         
-        TOKENARRAY t_array = tokenize(raw_input);
-        printf("tarray len = %ld\n", t_array.len);
-        printf("tarray cap = %ld\n", t_array.capacity);
-        for (int i = 0; i < t_array.len; i++) {
-            printf("Token %d: type: %s value: %s\n", i, typetostr(t_array.items[i].type),t_array.items[i].value);
+        TOKENARRAY t_array;
+        if (tokenize(raw_input, &t_array) == 0) {
+            printf("tarray len = %ld\n", t_array.len);
+            printf("tarray cap = %ld\n", t_array.capacity);
+            for (int i = 0; i < t_array.len; i++) {
+                printf("Token %d: type: %s value: %s\n", i, typetostr(t_array.items[i].type),t_array.items[i].value);
+            }
+        } else {
+            printf("Tokenize error\n");
         }
         
         free(t_array.items);
