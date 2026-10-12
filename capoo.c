@@ -8,6 +8,7 @@
 
 #include "token.h"
 #include "parse.h"
+#include "executor.h"
 
 #define CAPACITY    4
 #define NORMAL      0
@@ -123,6 +124,9 @@ int main(int argc, char *argv[]) {
                 printf("\t\tInput_dir: %s\n\t\tOutput_dir: %s\n", cmd.input_dir, cmd.output_dir);
             }
         }        
+
+        execute(pl_array);
+
            
         //deallocate
        

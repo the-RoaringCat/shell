@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g
 
 TARGET = capoo
-SRCS = capoo.c token.c parse.c
+SRCS = capoo.c token.c parse.c executor.c
 OBJS = $(SRCS:.c=.o)
 
 all: $(TARGET)
