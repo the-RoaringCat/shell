@@ -1,19 +1,18 @@
 ## A Shell
 There should be a lot of bugs, that I have not fixed or I did not realise.
 
+The `wish.c` is minimally working. `capoo.c` is a stronger version.
+
 # How to use
 On your linux
 ```
-$ gcc wish.c -o wish
-$ ./wish
+$ make run
 ```
 
+
+
 # Built in command
-```
-exit
-echo
-cd
-```
+
 
 # Parse
 The user input is first tokenized. For example: 
@@ -36,4 +35,23 @@ Token 11: type: WORD value: >escaped
 Token 12: type: WORD value: ab
 Token 13: type: WORD value: ab
 Token 14: type: WORD value: ab
+```
+
+Then they are parsed:
+```
+capoo> grep "hello world" < "input file.txt" | sort -r > 'output file.txt' & echo "done | finished" > result.txt
+Pipeline 0:
+        Command 0:
+                Argv: grep hello world
+                Input_dir: input file.txt
+                Output_dir: (null)
+        Command 1:
+                Argv: sort -r
+                Input_dir: (null)
+                Output_dir: output file.txt
+Pipeline 1:
+        Command 0:
+                Argv: echo done | finished
+                Input_dir: (null)
+                Output_dir: result.txt
 ```
