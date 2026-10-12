@@ -4,65 +4,12 @@
 #include <unistd.h>
 #include <string.h>
 
-#include <fcntl.h>
+#include "token.h"
+#include "utility.h"
+// #include <fcntl.h>
+// extern FILE *stdin;
 
-#define INIT_CAPACITY 8
-
-#define da_INIT(type) ((type){0, 0, NULL})
-//I learn this from tsoding, writing an append for diff dynamic array is tiring 
-#define da_append(da, item)\
-    do {\
-        if (da.len == da.capacity) {\
-            if (da.capacity == 0) {\
-                da.capacity = INIT_CAPACITY;\
-            } else {\
-                da.capacity *= 2;\
-            }\
-            da.items = realloc(da.items, da.capacity * sizeof(*da.items));\
-        }\
-        da.items[da.len++] = item;\
-    } while (0)
-
-//return 1 if flag is 1 and flag cleared, return 0 if flag is 0. 
-#define test_and_clear(flag) (flag && (flag = 0, 1))
-
-extern FILE *stdin;
-
-typedef enum {
-    WORD,
-    PIPE,
-    PARALLEL,
-    REDIR_IN,
-    REDIR_OUT,
-    VOID
-} TOKENTYPE;
-
-typedef struct token {
-    TOKENTYPE type;
-    char *value;
-} TOKEN;
-
-typedef struct da_tokens {
-    size_t len;
-    size_t capacity;
-    TOKEN *items;
-} TOKENARRAY;
-
-typedef struct da_sb {
-    size_t len;
-    size_t capacity;
-    char *items;
-} STRINGBUILDER;
-
-typedef enum {
-    NORMAL,
-    QUOTE,
-    SINGLE_QUOTE,
-    DOUBLE_QUOTE
-} STATE;
-
-
-TOKENTYPE findtype(char c) {
+static TOKENTYPE findtype(char c) {
     switch(c) {
         case '&': 
             return PARALLEL;         
@@ -76,7 +23,6 @@ TOKENTYPE findtype(char c) {
             return WORD;
     }
 }
-
 
 //TODO another case for escape? for expansion
 
@@ -160,65 +106,67 @@ int tokenize(const char *input, TOKENARRAY *user_t_array)
             da_append(t_array, t);
         }
     } //end of char loop
+
     if (word_started) { //if there is one last word
         da_append(sb, '\0');
         TOKEN t = {WORD, sb.items};
         da_append(t_array, t); 
     }
+
     *user_t_array = t_array;
     return 0;
 
     error:
         //free whatever emitted, then free the stringbuilder
-        for (int i = 0; i < t_array.len; i++) {
+        for (size_t i = 0; i < t_array.len; i++) {
             free(t_array.items[i].value);
         }
         free(sb.items);
         return -1;
 }
-char *typetostr(TOKENTYPE type) {
-    switch(type) {
-        case WORD:
-            return "WORD";
-        case PIPE:
-            return "PIPE";
-        case PARALLEL:
-            return "PARALLEL";
-        case REDIR_IN:
-            return "REDIR_IN";
-        case REDIR_OUT:
-            return "REDIR_OUT";
-    }
-}
-int main(int argc, char *argv[]) {
-    while(1) {
-        printf("capoo> ");    
+// char *typetostr(TOKENTYPE type) {
+//     switch(type) {
+//         case WORD:
+//             return "WORD";
+//         case PIPE:
+//             return "PIPE";
+//         case PARALLEL:
+//             return "PARALLEL";
+//         case REDIR_IN:
+//             return "REDIR_IN";
+//         case REDIR_OUT:
+//             return "REDIR_OUT";
+//     }
+// }
+// int main(int argc, char *argv[]) {
+//     while(1) {
+//         printf("capoo> ");    
         
-        //take input
-        char *raw_input = NULL;
-        size_t allocated_len = 0;
-        ssize_t nread;
+//         //take input
+//         char *raw_input = NULL;
+//         size_t allocated_len = 0;
+//         ssize_t nread;
 
-        nread = getline(&raw_input, &allocated_len, stdin);
-        if (nread == -1) {  //when hitting EOF or error
-            if (ferror(stdin)) {
-                perror("reading input");
-            }
-            exit(0);
-        }
+//         nread = getline(&raw_input, &allocated_len, stdin);
+//         if (nread == -1) {  //when hitting EOF or error
+//             if (ferror(stdin)) {
+//                 perror("reading input");
+//             }
+//             exit(0);
+//         }
         
-        TOKENARRAY t_array;
-        if (tokenize(raw_input, &t_array) == 0) {
-            printf("tarray len = %ld\n", t_array.len);
-            printf("tarray cap = %ld\n", t_array.capacity);
-            for (int i = 0; i < t_array.len; i++) {
-                printf("Token %d: type: %s value: %s\n", i, typetostr(t_array.items[i].type),t_array.items[i].value);
-            }
-        } else {
-            printf("Tokenize error\n");
-        }
+//         TOKENARRAY t_array;
+//         if (tokenize(raw_input, &t_array) == 0) {
+//             printf("tarray len = %ld\n", t_array.len);
+//             printf("tarray cap = %ld\n", t_array.capacity);
+//             for (int i = 0; i < t_array.len; i++) {
+//                 printf("Token %d: type: %s value: %s\n", i, typetostr(t_array.items[i].type),t_array.items[i].value);
+//             }
+//         } else {
+//             printf("Tokenize error\n");
+//         }
         
-        free(t_array.items);
-        free(raw_input);
-    }
-}
+//         free(t_array.items);
+//         free(raw_input);
+//     }
+// }
