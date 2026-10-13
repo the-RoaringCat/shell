@@ -14,6 +14,7 @@ typedef struct da_pipeline {
     size_t len;
     size_t capacity;
     COMMAND *items;
+    int is_background;
 } PIPELINE;
 
 typedef struct da_plarray {

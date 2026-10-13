@@ -111,8 +111,9 @@ int main(int argc, char *argv[]) {
             printf("error in parse\n");
         }
         for (size_t i = 0; i < pl_array.len; i++) { //for each pipeline
-            printf("Pipeline %ld:\n", i);
             PIPELINE pl = pl_array.items[i];
+            printf("Pipeline %ld:\tbackground: %s\n", i, pl.is_background ? "yes" : "no");
+            
             for (size_t j = 0; j < pl.len; j++) { //for each command in a pipeline
                 COMMAND cmd = pl.items[j];
                 printf("\tCommand %ld:\n", j);

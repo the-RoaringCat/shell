@@ -7,25 +7,25 @@
 
 
 
-static void cmd_init(COMMAND *cmdp) {
+static COMMAND cmd_init() {
     COMMAND cmd;
     cmd.argv = da_INIT(STRINGARRAY);
     cmd.input_dir = NULL;
     cmd.output_dir = NULL;
-    *cmdp = cmd;
+    return cmd;
 }
+
 
 int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
     PIPELINE pl = da_INIT(PIPELINE);
-    PLARRAY pl_array = da_INIT(PLARRAY);
+    PLARRAY pl_array = da_INIT(PLARRAY); //is_background is omitted, so init to 0
     *user_pl_array = pl_array;
 
     int cmd_started = 0;
     int pipe_started = 0;
 
-    COMMAND cmd;
-    cmd_init(&cmd);
-
+    COMMAND cmd = cmd_init();
+    
     //for each token, allocate 
     //TODO terminate a argv with NULL
     for (size_t i = 0; i < t_array.len; i++) {
@@ -54,7 +54,7 @@ int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
             if (test_and_clear(cmd_started)) { 
                 pipe_started = 1;
                 da_append(pl, cmd);
-                cmd_init(&cmd);
+                cmd = cmd_init();
             }
             break;
 
@@ -63,9 +63,10 @@ int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
             if (test_and_clear(cmd_started)) {
                 pipe_started = 1;
                 da_append(pl, cmd);
-                cmd_init(&cmd);
+                cmd = cmd_init();
             }
             if (test_and_clear(pipe_started)) {
+                pl.is_background = 1;
                 da_append(pl_array, pl);
                 pl = da_INIT(PIPELINE);
             }
