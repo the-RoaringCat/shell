@@ -12,7 +12,7 @@
 static TOKENTYPE findtype(char c) {
     switch(c) {
         case '&': 
-            return PARALLEL;         
+            return BACKGROUND;         
         case '|':
             return PIPE;
         case '<':
@@ -119,54 +119,8 @@ int tokenize(const char *input, TOKENARRAY *user_t_array)
     error:
         //free whatever emitted, then free the stringbuilder
         for (size_t i = 0; i < t_array.len; i++) {
-            free(t_array.items[i].value);
+            free(t_array.items[i].value); //char *
         }
         free(sb.items);
         return -1;
 }
-// char *typetostr(TOKENTYPE type) {
-//     switch(type) {
-//         case WORD:
-//             return "WORD";
-//         case PIPE:
-//             return "PIPE";
-//         case PARALLEL:
-//             return "PARALLEL";
-//         case REDIR_IN:
-//             return "REDIR_IN";
-//         case REDIR_OUT:
-//             return "REDIR_OUT";
-//     }
-// }
-// int main(int argc, char *argv[]) {
-//     while(1) {
-//         printf("capoo> ");    
-        
-//         //take input
-//         char *raw_input = NULL;
-//         size_t allocated_len = 0;
-//         ssize_t nread;
-
-//         nread = getline(&raw_input, &allocated_len, stdin);
-//         if (nread == -1) {  //when hitting EOF or error
-//             if (ferror(stdin)) {
-//                 perror("reading input");
-//             }
-//             exit(0);
-//         }
-        
-//         TOKENARRAY t_array;
-//         if (tokenize(raw_input, &t_array) == 0) {
-//             printf("tarray len = %ld\n", t_array.len);
-//             printf("tarray cap = %ld\n", t_array.capacity);
-//             for (int i = 0; i < t_array.len; i++) {
-//                 printf("Token %d: type: %s value: %s\n", i, typetostr(t_array.items[i].type),t_array.items[i].value);
-//             }
-//         } else {
-//             printf("Tokenize error\n");
-//         }
-        
-//         free(t_array.items);
-//         free(raw_input);
-//     }
-// }

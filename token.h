@@ -4,7 +4,7 @@
 typedef enum {
     WORD,
     PIPE,
-    PARALLEL,
+    BACKGROUND,
     REDIR_IN,
     REDIR_OUT,
     VOID

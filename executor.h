@@ -13,6 +13,14 @@ typedef struct da_pids {
     pid_t *items;
 } PIDS;
 
+typedef void (*builtin_func)(int argc, char **argv);
+
+typedef struct builtincmd {
+    char *name;
+    builtin_func func;
+} BICOMMAND;
+
+
 int execute(PLARRAY pl_array);
 
 #endif //EXECUTOR_H

@@ -3,10 +3,37 @@
 #include <unistd.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include "executor.h"
 #include "parse.h"
 #include "utility.h"
+
+
+static void builtin_exit(int argc, char **argv) {
+    exit(0);
+}
+
+BICOMMAND builtin_commands[] = {
+    {"exit", builtin_exit},
+};
+
+int execute_builtin(PLARRAY pl_array) {
+    size_t bicmd_cnt = sizeof(builtin_commands) / sizeof(builtin_commands[0]);  
+    for (size_t i = 0; i < pl_array.len; i++) {
+        PIPELINE pl = pl_array.items[i];
+        for (size_t j = 0; j < pl.len; j++) {
+            STRINGARRAY argv = pl.items[j].argv;
+            for (size_t k = 0; k < bicmd_cnt; k++) {
+                if (strcmp(builtin_commands[k].name, argv.items[0]) == 0) {
+                    builtin_commands[k].func(argv.len ,argv.items);
+                    return 1;
+                }
+            }
+        }
+    }
+    return 0;
+}
 
 static int execute_pipeline(PIPELINE pl) {
     //cmd0 --pipe0--> cmd1 --pipe1--> cmd2...
@@ -18,6 +45,9 @@ static int execute_pipeline(PIPELINE pl) {
 
 
     for (size_t i = 0; i < pl.len; i++) {
+        COMMAND cmd = pl.items[i];
+        char **arguments = cmd.argv.items;
+        
         pid_t child_pid = fork();
         if (child_pid > 0) {
             //parent
@@ -40,17 +70,17 @@ static int execute_pipeline(PIPELINE pl) {
             }
 
             //redirection
-            if (pl.items[i].input_dir != NULL) {
-                int fd = open(pl.items[i].input_dir, O_RDONLY);
+            if (cmd.input_dir != NULL) {
+                int fd = open(cmd.input_dir, O_RDONLY);
                 dup2(fd, STDIN_FILENO);
             }
 
-            if (pl.items[i].output_dir != NULL) {
-                int fd = open(pl.items[i].output_dir, O_CREAT | O_WRONLY, S_IRWXU);
+            if (cmd.output_dir != NULL) {
+                int fd = open(cmd.output_dir, O_CREAT | O_WRONLY, S_IRWXU);
                 dup2(fd, STDOUT_FILENO);
             }
 
-            execvp(pl.items[i].argv.items[0], pl.items[i].argv.items);
+            execvp(arguments[0], arguments);
             exit(1);
         }
     }
@@ -64,7 +94,6 @@ static int execute_pipeline(PIPELINE pl) {
             wait(NULL);
         }
     }
-    
 
     return 0;
 }

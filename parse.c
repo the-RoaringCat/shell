@@ -51,17 +51,20 @@ int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
        
         case PIPE:
             //if there is a command save the cmd and reinit it
+            //this could ignore multiple |?
             if (test_and_clear(cmd_started)) { 
                 pipe_started = 1;
+                da_append(cmd.argv, NULL); //terminate 
                 da_append(pl, cmd);
                 cmd = cmd_init();
             }
             break;
 
-        case PARALLEL:
+        case BACKGROUND:
             //save the pipeline and reinit it
             if (test_and_clear(cmd_started)) {
                 pipe_started = 1;
+                da_append(cmd.argv, NULL); //terminate 
                 da_append(pl, cmd);
                 cmd = cmd_init();
             }
@@ -82,6 +85,7 @@ int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
 
     if (cmd_started) {
         pipe_started = 1;
+        da_append(cmd.argv, NULL); //terminate 
         da_append(pl, cmd);
     } 
     if (pipe_started) {
@@ -92,6 +96,25 @@ int parse(TOKENARRAY t_array, PLARRAY *user_pl_array) {
     return 0;
 
     error:
-        //free
+        //free each token (value come from da_sb or strdup)
+        for (size_t i = 0; i < t_array.len; i++) {
+            free(t_array.items[i].value); //char *
+        }
+        //free the token array
+        free(t_array.items); //TOKEN *
+
+        //free the not yet saved command's agrv
+        free(cmd.argv.items); //char **
+
+        //free the not yet saved pipeline
+        free(pl.items); //COMMAND *
+
+        //free pipelines
+        for (size_t i = 0; i < pl_array.len; i++) {
+            free(pl_array.items[i].items);//COMMAND *
+        }
+        
+        //free the pipeline array
+        free(pl_array.items);//PIPELINE *
         return -1;
 }
